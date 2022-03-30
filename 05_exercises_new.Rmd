@@ -62,6 +62,10 @@ breed_traits <- readr::read_csv('https://raw.githubusercontent.com/rfordatascien
 trait_description <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/trait_description.csv')
 breed_rank_all <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_rank.csv')
 
+data_site <- 
+  "https://www.macalester.edu/~dshuman1/data/112/2014-Q4-Trips-History-Data-Small.rds" 
+Trips <- readRDS(gzcon(url(data_site)))
+Stations<-read_csv("http://www.macalester.edu/~dshuman1/data/112/DC-Stations.csv")
 ```
 
 ## Put your homework on GitHub!
@@ -88,7 +92,7 @@ Once your repository is created, you should always open your **project** rather 
 
   1. Choose 2 graphs you have created for ANY assignment in this class and add interactivity using the `ggplotly()` function.
   
-```{r}
+```{r,fig.alt= " interactive chart of the top-20 dogs in total ratings"}
 #dog
 newb_breed_traits_total <- breed_traits_total %>%
   mutate(breedR = str_squish(Breed)) %>%
@@ -118,10 +122,69 @@ new_breed_rank_all_graph <- new_breed_rank_all %>%
 ggplotly(new_breed_rank_all_graph, tooltip = c("text","colour") )
 ```
 
+```{r , fig.alt= " interactive chart of stations with the casual users' proportion"}
+staTrip2 <- Trips %>%
+  left_join(Stations, by = c ("sstation" = "name")) %>%
+  group_by(lat, long, client) %>%
+  summarise(numEventGroup = n()) %>%
+  mutate(totalEvent = sum(numEventGroup)) %>%
+  mutate(prop = numEventGroup / totalEvent) %>%
+  pivot_wider(names_from = client, values_from = prop) %>%
+  select(-c(Registered)) %>%
+  distinct(totalEvent, .keep_all = TRUE) %>%
+  ungroup() %>% 
+  select("lat","long","Casual")
+
+staTrip2_graph <- staTrip2 %>%
+  ggplot(aes(x = long, y = lat, color = Casual)) +
+  geom_point() +
+  scale_color_viridis_c() +
+  labs(title = "Proportion of Casual Clients' Departures From Each Station", x = "Longtitude", y =
+         "Latitude")
+
+ggplotly(staTrip2_graph , tooltip = c("text","colour") )
+```
   
   2. Use animation to tell an interesting story with the `small_trains` dataset that contains data from the SNCF (National Society of French Railways). These are Tidy Tuesday data! Read more about it [here](https://github.com/rfordatascience/tidytuesday/tree/master/data/2019/2019-02-26).
 
+```{r, fig.alt="Average Arriving Delay Time of Each Arrival Station By Month"}
+newsmall_trains <- small_trains %>%
+  group_by(departure_station) %>%
+  mutate(numDp = n()) %>%
+  filter(departure_station == "PARIS LYON" & service=="International") %>% 
+  group_by(year,month) %>% 
+  distinct(arrival_station,  .keep_all = TRUE) %>% 
+  filter(avg_delay_all_arriving >=0) %>% 
+  mutate(month_of_year =fct_infreq(month.abb[as.numeric(month)]))
 
+newsmall_trains %>% 
+  ggplot(aes(x = avg_delay_all_arriving, 
+             y =month_of_year,
+             color = arrival_station,
+             shape=arrival_station)) +
+ geom_point() +
+  labs(title = "Average Arriving Delay Time of Each Arrival Station By Month", 
+       subtitle = "Month: {closest_state}",
+       x = "",
+       y = "",
+      ) +
+  theme(legend.position = "top",
+        legend.title = element_blank())+
+    transition_states(year, transition_length = 2, 
+                    state_length = 1)+
+  exit_shrink() +
+  enter_recolor(color = "lightblue") +
+  exit_recolor(color = "lightblue")
+
+```
+
+```{r, eval=FALSE, echo=FALSE}
+anim_save("Arrival Delay Time By Stations.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("Arrival Delay Time By Stations.gif")
+```
 ## Garden data
 
   3. In this exercise, you will create a stacked area plot that reveals itself over time (see the `geom_area()` examples [here](https://ggplot2.tidyverse.org/reference/position_stack.html)). You will look at cumulative harvest of tomato varieties over time. I have filtered the data to the tomatoes and find the *daily* harvest in pounds for each variety. The `complete()` function creates a row for all unique `date`/`variety` combinations. If a variety is not harvested on one of the harvest dates in the dataset, it is filled with a value of 0. 
@@ -130,16 +193,47 @@ ggplotly(new_breed_rank_all_graph, tooltip = c("text","colour") )
   * Use the data you just made to create a static cumulative harvest area plot, with the areas filled with different colors for each variety and arranged (HINT: `fct_reorder()`) from most to least harvested weights (most on the bottom).  
   * Add animation to reveal the plot over date. Instead of having a legend, place the variety names directly on the graph (refer back to the tutorial for how to do this).
 
-```{r}
-garden_harvest %>% 
+```{r, fig.alt=“Cumulative Tomato Harvest (lb)”}
+newgarden_harvest<-garden_harvest %>% 
   filter(vegetable == "tomatoes") %>% 
   group_by(date, variety) %>% 
   summarize(daily_harvest_lb = sum(weight)*0.00220462) %>% 
   ungroup() %>% 
   complete(variety, 
            date, 
-           fill = list(daily_harvest_lb = 0))
-  
+           fill = list(daily_harvest_lb = 0)) %>% 
+  mutate(variety = fct_reorder(variety, 
+                               daily_harvest_lb, 
+                               sum, 
+                               .desc = FALSE)) %>% 
+  group_by(variety) %>% 
+  mutate(cum_harvest_lb = cumsum(daily_harvest_lb))
+ 
+newgarden_harvest %>% 
+  group_by(variety) %>% 
+  mutate(cum_harvest_lb = cumsum(daily_harvest_lb)) %>% 
+  ggplot(aes(x = date, 
+             y = cum_harvest_lb, 
+             fill = variety)) +
+  geom_area(position = "stack") +
+  geom_text(aes(label = variety),
+            position = "stack", 
+            check_overlap = TRUE) +
+  scale_fill_viridis_d(option = "plasma") +
+  theme(legend.position = "none") +
+  transition_reveal(date)  +
+  labs(title = "Cumulative Tomato Harvest (lb)",
+       subtitle = "Date: {frame_along}",
+       x = "",
+       y = "") 
+```
+
+```{r, eval=FALSE, echo=FALSE}
+anim_save("Cumulative Tomato Harvest (lb).gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("Cumulative Tomato Harvest (lb).gif")
 ```
 
 
@@ -154,6 +248,57 @@ garden_harvest %>%
   * Show the time in the subtitle.  
   * CHALLENGE: use the `ggimage` package and `geom_image` to add a bike image instead of a red point. You can use [this](https://raw.githubusercontent.com/llendway/animation_and_interactivity/master/bike.png) image. See [here](https://goodekat.github.io/presentations/2019-isugg-gganimate-spooky/slides.html#35) for an example. 
   * Add something of your own! And comment on if you prefer this to the static map and why or why not.
+```{r, fig.alt="map and path of Lisa's ride"}
+mallorca_map <- get_stamenmap(
+  bbox = c(
+    left = 2.2800,
+    bottom = 39.2514,
+    right = 3.5568,
+    top = 39.9771
+  ),
+  maptype = "toner-lite",
+  zoom = 10
+)
+
+ggmap(mallorca_map) +
+  geom_path(data = mallorca_bike_day7,
+            aes(x = lon, y = lat, color = ele)) +
+  geom_point(data = mallorca_bike_day7,
+             aes(x = lon, y = lat),
+             colour = "red",
+             size = 2)+  
+  annotate(
+    geom = "point",
+    x = 2.586255,
+    y = 39.66033 ,
+    colour = "lightseagreen",
+    size = 3
+  ) +
+  annotate(
+    geom = "text",
+     x = 2.586255,
+    y = 39.66033 ,
+    label = "Start Point",
+    hjust = -0.2,
+    vjust = 0.2,
+    color = "lightseagreen"
+  )+
+  scale_color_viridis_c(option = "mako") +
+  theme_map() +
+  theme(legend.background = element_blank()) +
+  transition_reveal(along = time) +
+  labs(title = "Lisa's Biking Path",
+       subtitle = "Time: {frame_along}")
+```
+```{r, eval=FALSE, echo=FALSE}
+anim_save("Lisa's Biking Path.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("Lisa's Biking Path.gif")
+```
+  
+>I prefer the animation over the static one. With the dynamite of the path and the fancier overview, this one is naturally more attractive to the viewer.
   
   5. In this exercise, you get to meet Lisa's sister, Heather! She is a proud Mac grad, currently works as a Data Scientist where she uses R everyday, and for a few years (while still holding a full-time job) she was a pro triathlete. You are going to map one of her races. The data from each discipline of the Ironman 70.3 Pan Am championships, Panama is in a separate file - `panama_swim`, `panama_bike`, and `panama_run`. Create a similar map to the one you created with my cycling data. You will need to make some small changes: 1. combine the files putting them in swim, bike, run order (HINT: `bind_rows()`), 2. make the leading dot a different color depending on the event (for an extra challenge, make it a different image using `geom_image()!), 3. CHALLENGE (optional): color by speed, which you will need to compute on your own from the data. You can read Heather's race report [here](https://heatherlendway.com/2016/02/10/ironman-70-3-pan-american-championships-panama-race-report/). She is also in the Macalester Athletics [Hall of Fame](https://athletics.macalester.edu/honors/hall-of-fame/heather-lendway/184) and still has records at the pool. 
   
