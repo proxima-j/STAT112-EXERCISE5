@@ -94,6 +94,12 @@ Once your repository is created, you should always open your **project** rather 
   
 ```{r,fig.alt= " interactive chart of the top-20 dogs in total ratings"}
 #dog
+breed_traits_total<-breed_traits %>% 
+ select(-c("Coat Type", "Coat Length")) %>% 
+  pivot_longer(!Breed, names_to = "level", values_to = "rating") %>% 
+  group_by(Breed) %>% 
+  summarise(total_rating=sum(rating))
+
 newb_breed_traits_total <- breed_traits_total %>%
   mutate(breedR = str_squish(Breed)) %>%
   slice_max(n = 20, order_by = total_rating)
@@ -157,21 +163,26 @@ newsmall_trains <- small_trains %>%
   filter(avg_delay_all_arriving >=0) %>% 
   mutate(month_of_year =fct_infreq(month.abb[as.numeric(month)]))
 
-newsmall_trains %>% 
-  ggplot(aes(x = avg_delay_all_arriving, 
-             y =month_of_year,
-             color = arrival_station,
-             shape=arrival_station)) +
- geom_point() +
-  labs(title = "Average Arriving Delay Time of Each Arrival Station By Month", 
-       subtitle = "Month: {closest_state}",
-       x = "",
-       y = "",
-      ) +
+newsmall_trains %>%
+  ggplot(
+    aes(
+      x = avg_delay_all_arriving,
+      y = month_of_year,
+      color = arrival_station,
+      shape = arrival_station
+    )
+  ) +
+  geom_point() +
+  labs(
+    title = "Average Arriving Delay Time of Each Arrival Station By Month",
+    subtitle = "Year: {closest_state}",
+    x = "",
+    y = "",
+  ) +
   theme(legend.position = "top",
-        legend.title = element_blank())+
-    transition_states(year, transition_length = 2, 
-                    state_length = 1)+
+        legend.title = element_blank()) +
+  transition_states(year, transition_length = 2,
+                    state_length = 1) +
   exit_shrink() +
   enter_recolor(color = "lightblue") +
   exit_recolor(color = "lightblue")
@@ -194,21 +205,21 @@ knitr::include_graphics("Arrival Delay Time By Stations.gif")
   * Add animation to reveal the plot over date. Instead of having a legend, place the variety names directly on the graph (refer back to the tutorial for how to do this).
 
 ```{r, fig.alt=“Cumulative Tomato Harvest (lb)”}
-newgarden_harvest<-garden_harvest %>% 
-  filter(vegetable == "tomatoes") %>% 
-  group_by(date, variety) %>% 
-  summarize(daily_harvest_lb = sum(weight)*0.00220462) %>% 
-  ungroup() %>% 
-  complete(variety, 
-           date, 
-           fill = list(daily_harvest_lb = 0)) %>% 
-  mutate(variety = fct_reorder(variety, 
-                               daily_harvest_lb, 
-                               sum, 
-                               .desc = FALSE)) %>% 
-  group_by(variety) %>% 
+newgarden_harvest <- garden_harvest %>%
+  filter(vegetable == "tomatoes") %>%
+  group_by(date, variety) %>%
+  summarize(daily_harvest_lb = sum(weight) * 0.00220462) %>%
+  ungroup() %>%
+  complete(variety,
+           date,
+           fill = list(daily_harvest_lb = 0)) %>%
+  mutate(variety = fct_reorder(variety,
+                               daily_harvest_lb,
+                               sum,
+                               .desc = FALSE)) %>%
+  group_by(variety) %>%
   mutate(cum_harvest_lb = cumsum(daily_harvest_lb))
- 
+
 newgarden_harvest %>% 
   group_by(variety) %>% 
   mutate(cum_harvest_lb = cumsum(daily_harvest_lb)) %>% 
@@ -219,7 +230,7 @@ newgarden_harvest %>%
   geom_text(aes(label = variety),
             position = "stack", 
             check_overlap = TRUE) +
-  scale_fill_viridis_d(option = "plasma") +
+  scale_fill_viridis_d(option = "rocket") +
   theme(legend.position = "none") +
   transition_reveal(date)  +
   labs(title = "Cumulative Tomato Harvest (lb)",
@@ -302,8 +313,39 @@ knitr::include_graphics("Lisa's Biking Path.gif")
   
   5. In this exercise, you get to meet Lisa's sister, Heather! She is a proud Mac grad, currently works as a Data Scientist where she uses R everyday, and for a few years (while still holding a full-time job) she was a pro triathlete. You are going to map one of her races. The data from each discipline of the Ironman 70.3 Pan Am championships, Panama is in a separate file - `panama_swim`, `panama_bike`, and `panama_run`. Create a similar map to the one you created with my cycling data. You will need to make some small changes: 1. combine the files putting them in swim, bike, run order (HINT: `bind_rows()`), 2. make the leading dot a different color depending on the event (for an extra challenge, make it a different image using `geom_image()!), 3. CHALLENGE (optional): color by speed, which you will need to compute on your own from the data. You can read Heather's race report [here](https://heatherlendway.com/2016/02/10/ironman-70-3-pan-american-championships-panama-race-report/). She is also in the Macalester Athletics [Hall of Fame](https://athletics.macalester.edu/honors/hall-of-fame/heather-lendway/184) and still has records at the pool. 
   
-```{r}
+```{r,fig.alt="Heather's Panama Pat"}
+panamaTotal <- bind_rows(panama_swim, panama_bike, panama_run)
 
+panama_map <- get_stamenmap(
+  bbox = c(
+    left = -79.55505,
+    bottom = 8.913268,
+    right = -79.51230,
+    top = 8.985033
+  ),
+  maptype = "toner-lite",
+  zoom = 14
+)
+
+ggmap(panama_map) +
+  geom_path(data = panamaTotal,
+            aes(x = lon, y = lat), color = "aquamarine") +
+  geom_point(data = panamaTotal,
+             aes(x = lon, y = lat, color = event),
+             size = 2) +
+  scale_color_viridis_d(option = "mako") +
+  theme_map() +
+  theme(legend.background = element_blank()) +
+  transition_reveal(along = time) +
+  labs(title = " Heather's Panama Path",
+       subtitle = "Time: {frame_along}")
+```
+```{r, eval=FALSE, echo=FALSE}
+anim_save("Heather's Panama Path.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("Heather's Panama Path.gif")
 ```
   
 ## COVID-19 data
@@ -316,14 +358,55 @@ knitr::include_graphics("Lisa's Biking Path.gif")
   * Use `group = date` in `aes()`.   
   * Comment on what you see.  
 
-```{r}
+```{r,fig.alt="Cumulative Covid19 Cases Per 10,000 People By States"}
 census_pop_est_2018 <- read_csv("https://www.dropbox.com/s/6txwv3b4ng7pepe/us_census_2018_state_pop_est.csv?dl=1") %>% 
   separate(state, into = c("dot","state"), extra = "merge") %>% 
   select(-dot) %>% 
   mutate(state = str_to_lower(state))
 
 states_map <- map_data("state")
+
+cases_with_2018_pop_est <- covid19  %>%
+  mutate(day = mday(date),
+         state = str_to_lower(state)) %>%
+  filter(day == 15) %>%
+  left_join(census_pop_est_2018,
+            by = c("state" = "state")) %>%
+  mutate(cum_cases_per_10000 = (cases / est_pop_2018) * 10000)
+
+cases_with_2018_pop_est_map <- cases_with_2018_pop_est %>%
+  ggplot() +
+  geom_map(map = states_map,
+           aes(
+             map_id = state,
+             fill = cum_cases_per_10000,
+             group = date
+           )) +
+  scale_fill_continuous(type = "viridis") +
+  expand_limits(x = states_map$long, y = states_map$lat) +
+  labs(
+    title = "Cumulative Covid19 Cases Per 10,000 People By States ",
+    fill = NULL,
+    subtitle = "Date: {closest_state}",
+    x = "",
+    y = "",
+  ) +
+  theme_map() +
+  theme(legend.position = "top") +
+  transition_states(date, transition_length = 2,
+                    state_length = 2) 
+
+animate(cases_with_2018_pop_est_map, nframes = 200, end_pause = 10)
 ```
+```{r, eval=FALSE, echo=FALSE}
+anim_save("Cumulative Covid19 Cases Per 10,000 People By States.gif")
+```
+
+```{r, echo=FALSE}
+knitr::include_graphics("Cumulative Covid19 Cases Per 10,000 People By States.gif")
+```
+
+>WA,OR,ME and VT stay relatively longer time with lower number of cumulative cases per 10,000 people compare to other states.
 
 ## Your first `shiny` app (for next week!)
 
