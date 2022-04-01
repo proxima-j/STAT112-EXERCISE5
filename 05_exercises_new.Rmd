@@ -204,7 +204,7 @@ knitr::include_graphics("Arrival Delay Time By Stations.gif")
   * Use the data you just made to create a static cumulative harvest area plot, with the areas filled with different colors for each variety and arranged (HINT: `fct_reorder()`) from most to least harvested weights (most on the bottom).  
   * Add animation to reveal the plot over date. Instead of having a legend, place the variety names directly on the graph (refer back to the tutorial for how to do this).
 
-```{r, fig.alt=“Cumulative Tomato Harvest (lb)”}
+```{r, fig.alt="Cumulative Tomato Harvest (lb)"}
 newgarden_harvest <- garden_harvest %>%
   filter(vegetable == "tomatoes") %>%
   group_by(date, variety) %>%
